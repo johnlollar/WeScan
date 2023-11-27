@@ -14,6 +14,7 @@ import UIKit
 @objc public protocol CameraScannerViewOutputDelegate: AnyObject {
     func captureImageFailWithError(error: Error)
     func captureImageSuccess(image: UIImage)
+    func captureImageWithCropBounds(image: UIImage, bounds: NSDictionary)
     //func captureImageSuccess(image: UIImage, withQuad quad: Quadrilateral?)
 }
 
@@ -205,12 +206,59 @@ extension CameraScannerViewController: RectangleDetectionDelegateProtocol {
     func didStartCapturingPicture(for captureSessionManager: CaptureSessionManager) {
         captureSessionManager.stop()
     }
+    
+    // New image size for autocrop
+    func calculateNewImageSize(image: UIImage, screenSize: CGSize) -> UIImage? {
+        var screenWidth = screenSize.width
+        var screenHeight = screenSize.height
+        
+        let aspect = image.size.width / image.size.height
+        if (aspect > 1.0) {
+            // wide
+            screenHeight = screenWidth / aspect
+        } else {
+            // tall
+            screenWidth = screenHeight * aspect
+        }
+        
+        UIGraphicsBeginImageContextWithOptions(CGSize(width: screenWidth, height: screenHeight), true, 1.0)
+        let rect = CGRect(x: 0, y: 0, width: screenWidth, height: screenHeight)
+        image.draw(in: rect)
+        if let resizedImage: UIImage = UIGraphicsGetImageFromCurrentImageContext() {
+            UIGraphicsEndImageContext()
+            return resizedImage
+        } else {
+            return nil
+        }
+    }
+    
+    func transformQuadForAutoCrop(image: UIImage, quad: Quadrilateral) -> Quadrilateral? {
+        let imageSize = image.size
+        let mainScreenSize = UIScreen.main.bounds.size
+        guard let newImageSize: UIImage = calculateNewImageSize(image: image, screenSize: mainScreenSize) else { return nil }
+        let imageFrame = CGRect(origin: quadView.frame.origin, size: newImageSize.size)
+        let scaleTransform = CGAffineTransform.scaleTransform(forSize: imageSize, aspectFillInSize: imageFrame.size)
+        let transforms = [scaleTransform]
+        let transformedQuad = quad.applyTransforms(transforms)
+        
+        return transformedQuad
+    }
 
     func captureSessionManager(_ captureSessionManager: CaptureSessionManager,
                                didCapturePicture picture: UIImage,
                                withQuad quad: Quadrilateral?) {
-        delegate?.captureImageSuccess(image: picture)
-        //delegate?.captureImageSuccess(image: picture, withQuad: quad)
+        if let quadToTransform = quad,
+           let transformedQuad = transformQuadForAutoCrop(image: picture, quad: quadToTransform) {
+            let boundTopRight = transformedQuad.topRight
+            let boundBottomRight = transformedQuad.bottomRight
+            let boundTopLeft = transformedQuad.topLeft
+            let boundBottomLeft = transformedQuad.bottomLeft
+            let bounds: Dictionary = ["topRight": boundTopRight, "bottomRight": boundBottomRight,"topLeft": boundTopLeft, "bottomLeft": boundBottomLeft]
+            let objcBounds = bounds as NSDictionary
+            delegate?.captureImageWithCropBounds(image: picture, bounds: objcBounds)
+        } else {
+            delegate?.captureImageSuccess(image: picture)
+        }
     }
 
     func captureSessionManager(_ captureSessionManager: CaptureSessionManager,
