@@ -23,9 +23,10 @@ final class QuadrilateralView: UIView {
 
     private let quadLayer: CAShapeLayer = {
         let layer = CAShapeLayer()
-        layer.strokeColor = UIColor.white.cgColor
-        layer.lineWidth = 1.0
-        layer.opacity = 1.0
+        //layer.strokeColor = UIColor.white.cgColor
+        //layer.lineWidth = 1.0
+        layer.strokeColor = UIColor.orange.cgColor // border color for scanning box
+        layer.opacity = 2.0
         layer.isHidden = true
 
         return layer
@@ -46,7 +47,8 @@ final class QuadrilateralView: UIView {
     public var editable = false {
         didSet {
             cornerViews(hidden: !editable)
-            quadLayer.fillColor = editable ? UIColor(white: 0.0, alpha: 0.6).cgColor : UIColor(white: 1.0, alpha: 0.5).cgColor
+            //quadLayer.fillColor = editable ? UIColor(white: 0.0, alpha: 0.6).cgColor : UIColor(white: 1.0, alpha: 0.5).cgColor
+            quadLayer.fillColor = UIColor.orange.withAlphaComponent(0.4).cgColor // scanning box interior color
             guard let quad else {
                 return
             }
